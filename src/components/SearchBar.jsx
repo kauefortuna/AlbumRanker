@@ -6,7 +6,7 @@ function SearchBar({ value, onChange, onKeyDown }) {
   useEffect(() => {
     const delay = setTimeout(() => {
       onChange(inputValue);
-    }, 2000);
+    }, 450);
 
     return () => clearTimeout(delay); // cleanup previous timer
   }, [inputValue]);
@@ -43,7 +43,9 @@ function SearchBar({ value, onChange, onKeyDown }) {
           required
           type="text"
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+          }}
           onKeyDown={onKeyDown}
         />
         <button

@@ -8,7 +8,7 @@ export async function fetchAlbum(query, token, setFilteredAlbums) {
     const formattedQuery = query.split(" ").join("%20");
 
     const response = await fetch(
-      `https://api.spotify.com/v1/search?q=${formattedQuery}&type=album&limit=24&market=US`,
+      `https://api.spotify.com/v1/search?q=${formattedQuery}&type=album&limit=36&market=US`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -31,6 +31,9 @@ export async function fetchAlbum(query, token, setFilteredAlbums) {
       imageUrl: album.images[0]?.url,
       albumTitle: album.name,
       artistName: album.artists.map((a) => a.name).join(", "),
+      rating: null,
+      reviewTitle: null,
+      reviewText: null,
     }));
 
     setFilteredAlbums(formattedAlbums);
@@ -74,7 +77,7 @@ export async function fetchAlbumSongs(albumId, token, setSongs) {
     }));
 
     setSongs(formattedSongs);
-    console.log("Fetched tracks:", data);
+    //console.log("Fetched tracks:", data);
   } catch (err) {
     console.error("Error fetching songs:", err);
   }

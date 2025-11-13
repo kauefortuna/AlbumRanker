@@ -1,26 +1,66 @@
+//to-do : favourite song, average rating graph
+
 import SearchBar from "./components/SearchBar";
 import AlbumCard from "./components/AlbumCard";
 import "./index.css";
 import "./mobile.css";
 import { useState, useEffect, useRef } from "react";
-import DarkVeil from "./DarkVeil.jsx";
 import Iridescence from "./Iridescence.jsx";
 //import { loginUrl } from "./spotifyAuth.js";
 import Carousel from "./Carousel.jsx";
 import "./Carousel.css";
 import CarouselReverse from "./CarouselReverse.jsx";
-import LogoLoop from "./LogoLoop.jsx";
 import { redirectToSpotifyAuth, getAccessToken } from "./spotifyAuth.js";
 import { fetchAlbum } from "./fetchAlbums";
 import RateAlbumCard from "./components/RateAlbumCard.jsx";
+import RatedAlbumCard from "./components/RatedAlbumCard.jsx";
 /* const token =
     "BQC8fxNaAi0is4kNN3LXpYLgDQKGH7xLqswIDWLBUttUrx3nsp8mogUsZlr9dkqZ4grIiWMVuk1SnvdokX_JaG934ouMYaI2MT2jNdr_WTDekQfVG6wDZwyl1h3lEcBI3DoQt3ALsRtcs2ssqITNGw1BGHo5U4OsgsqJKdeUsrXwpPARnjSjLKtZRCDceLONGgbyEhHjOu1ZFlceB_2O9NcImJGgwhAEcpFJzg9xtG8MwOujKwvBOmOVRnuXuwYlBVxBFGAJbrRUjZjsdz4ohLm6288TkivrC1ekQ12ycjgVzoXA8UoT2HkGaKpWovmxrBKQ";
   const userId = "198f3046d64c4939a13ea8578b392fe0";
 
   */
 
+function isObjectNotInArray(arr, obj) {
+  return arr.some((item) => item.albumId == obj.albumId);
+}
+function setSelectedIntoRated(arr, obj, func) {
+  arr.map((item) => {
+    if (item.albumId == obj.albumId) {
+      func(item);
+    }
+  });
+}
+
 function App() {
   const [token, setToken] = useState(null);
+  const [loadingToken, setLoadingToken] = useState(true);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("spotify_token");
+
+    // 1. Try localStorage first
+    if (stored) {
+      setToken(stored);
+      setLoadingToken(false);
+      return;
+    }
+
+    // 2. Fall back to getAccessToken (e.g. from URL / backend)
+    getAccessToken()
+      .then((t) => {
+        if (t) {
+          setToken(t);
+          localStorage.setItem("spotify_token", t);
+        }
+      })
+      .finally(() => {
+        setLoadingToken(false);
+      });
+  }, []);
+  function handleSpotifyError() {
+    localStorage.removeItem("spotify_token");
+    window.location.reload();
+  }
 
   const [userId, setUserId] = useState(null);
 
@@ -39,6 +79,79 @@ function App() {
   const [FilteredAlbums, setFilteredAlbums] = useState([]);
 
   const [SelectedAlbum, setSelectedAlbum] = useState(null);
+
+  const [ratedAlbum, setRatedAlbum] = useState(null);
+
+  const [ratedAlbums, setRatedAlbums] = useState(() => {
+    try {
+      console.log("Loading rated albums from localStorage");
+      return JSON.parse(localStorage.getItem("ratedAlbums") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("ratedAlbums", JSON.stringify(ratedAlbums));
+  }, [ratedAlbums]);
+
+  const handleAlbumRated = (album, rating) => {
+    setRatedAlbums((prev) => {
+      const idx = prev.findIndex((x) => x.albumId === album.albumId);
+      const updated = { ...prev[idx], ...album, rating };
+
+      if (idx === -1) return [...prev, { ...album, rating }];
+
+      const copy = prev.slice();
+      copy[idx] = updated;
+      return copy;
+    });
+  };
+
+  const handleDeleteRating = (albumId) => {
+    // 1. Remove from rated list
+    setRatedAlbums((prev) => prev.filter((a) => a.albumId !== albumId));
+
+    // 2. Reset SelectedAlbum fields if it's the same album
+    setSelectedAlbum((prev) => {
+      if (!prev || prev.albumId !== albumId) return prev;
+
+      return {
+        ...prev,
+        rating: null,
+        reviewText: null,
+        reviewTitle: null,
+      };
+    });
+
+    const effectiveSelectedAlbum =
+      SelectedAlbum &&
+      (ratedAlbums.find((item) => item.albumId === SelectedAlbum.albumId) ||
+        SelectedAlbum);
+
+    // 3. (Optional) also clear from other lists that may carry the rating
+    setFilteredAlbums((prev) =>
+      prev.map((a) =>
+        a.albumId === albumId
+          ? { ...a, rating: null, reviewText: null, reviewTitle: null }
+          : a
+      )
+    );
+
+    setAllAlbums((prev) =>
+      prev.map((a) =>
+        a.albumId === albumId
+          ? { ...a, rating: null, reviewText: null, reviewTitle: null }
+          : a
+      )
+    );
+    setSelectedAlbum(null);
+  };
+
+  //for proofing
+  // useEffect(() => {
+  //   console.log("Rated Albums (state):", ratedAlbum);
+  // }, [ratedAlbum]);
 
   // const filteredAlbums =
   //   query.trim() === ""
@@ -59,7 +172,7 @@ function App() {
     for (const range of timeRanges) {
       try {
         const response = await fetch(
-          `https://api.spotify.com/v1/me/top/tracks?limit=36&time_range=${range}`,
+          `https://api.spotify.com/v1/me/top/tracks?limit24&time_range=${range}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -68,6 +181,7 @@ function App() {
         const data = await response.json();
 
         if (!data.items) {
+          handleSpotifyError();
           console.error(`Error fetching ${range} tracks:`, data);
           continue;
         }
@@ -97,12 +211,6 @@ function App() {
     fetchData({ token, setAllAlbums });
   }, [token, userId]);
   //chat
-  function handleSpotifyError(response) {
-    if (response.status === 401) {
-      window.localStorage.removeItem("spotify_token");
-      window.location.reload(); // Forces new login
-    }
-  }
 
   useEffect(() => {
     getAccessToken().then((token) => {
@@ -129,7 +237,7 @@ function App() {
     if (!token) return;
 
     fetch(
-      "https://api.spotify.com/v1/me/top/tracks?limit=36&time_range=long_term",
+      "https://api.spotify.com/v1/me/top/tracks?limit=24&time_range=medium_term",
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -152,8 +260,9 @@ function App() {
             }
           }
 
-          setAlbums(uniqueAlbums.slice(0, 36));
+          setAlbums(uniqueAlbums.slice(0, 24));
         } else {
+          handleSpotifyError();
           console.error("Error fetching top tracks:", data);
         }
       })
@@ -171,6 +280,24 @@ function App() {
       setAlbumArray2(covers.slice(half));
     }
   }, [albums]);
+
+  const [RatedResults, setRatedResults] = useState([]);
+
+  const searchRatedAlbums = (query) => {
+    const q = query.toLowerCase();
+
+    const results = ratedAlbums.filter(
+      (a) =>
+        a.albumTitle.toLowerCase().includes(q) ||
+        a.artistName.toLowerCase().includes(q)
+    );
+
+    setRatedResults(results);
+  };
+
+  if (loadingToken) {
+    return <div>Loading...</div>;
+  }
 
   if (!token) {
     return (
@@ -204,31 +331,67 @@ function App() {
           <h1>Album Ranker 3000</h1>
 
           <div className="HeaderSearch">
-            <SearchBar
-              inputValue={inputValue}
-              setInputValue={setInputValue}
-              value={inputValue}
-              onChange={(e) => setInputValue(e)}
-              onKeyDown={async (e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  setQuery(inputValue);
-                  await fetchAlbum(inputValue, token, setFilteredAlbums);
-                  setViewMode("filtered");
-                }
-              }}
-            />
+            <div className="HeaderSearch">
+              <SearchBar
+                inputValue={inputValue}
+                setInputValue={setInputValue}
+                value={inputValue}
+                onChange={(e) => setInputValue(e)}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter") {
+                    setFilteredAlbums([]);
+                    e.preventDefault();
+                    setQuery(inputValue);
+
+                    if (viewMode === "Rated") {
+                      // 🔍 Search only inside rated albums
+                      searchRatedAlbums(inputValue);
+                    } else {
+                      setFilteredAlbums([]);
+                      // 🔍 Normal Spotify search
+                      await fetchAlbum(inputValue, token, setFilteredAlbums);
+                      setViewMode("filtered");
+                    }
+
+                    setSelectedAlbum(null);
+                  } else {
+                    return;
+                  }
+                }}
+              />
+            </div>
           </div>
 
           <div className="HeaderButtons">
-            <button onClick={() => setViewMode("all")} className="active-btn">
+            <button
+              onClick={() => {
+                setViewMode("all");
+                setRatedResults([]);
+                setSelectedAlbum(null);
+              }}
+              className="active-btn"
+            >
               All Albums
             </button>
             <button
-              onClick={() => setViewMode("filtered")}
+              onClick={() => {
+                setViewMode("filtered");
+                setRatedResults([]);
+                setSelectedAlbum(null);
+              }}
               className="active-btn"
             >
               Filtered Albums
+            </button>
+            <button
+              onClick={() => {
+                setViewMode("Rated");
+                setRatedResults([]);
+                setSelectedAlbum(null);
+              }}
+              className="active-btn"
+            >
+              Rated Albums
             </button>
           </div>
         </div>
@@ -239,18 +402,6 @@ function App() {
         </div>
 
         {viewMode === "all" && (
-          //use map to create array of album cards each with unique information
-          //pass that array onto the carousel component
-          // <div className="AlbumsContainer">
-          //   {albums.map(({ imageUrl, albumTitle, artistName }) => (
-          //     <AlbumCard
-          //       key={albumTitle}
-          //       Image={imageUrl}
-          //       title={albumTitle}
-          //       artist={artistName}
-          //     />
-          //   ))}
-          // </div>
           <>
             <div className="carousel-wrapper">
               <Carousel
@@ -264,6 +415,76 @@ function App() {
           </>
         )}
 
+        {viewMode === "Rated" && (
+          <>
+            <div className="AlbumsContainer">
+              {RatedResults.length > 0 &&
+                RatedResults.map((a) => (
+                  <AlbumCard
+                    key={`${a.albumTitle}-${a.artistName}`}
+                    Image={a.imageUrl}
+                    title={a.albumTitle}
+                    artist={a.artistName}
+                    onClick={() => {
+                      setSelectedAlbum(a);
+                    }}
+                    rating={a.rating}
+                    reviewTitle={a.reviewTitle}
+                    reviewText={a.reviewText}
+                  />
+                ))}
+              {RatedResults.length == 0 &&
+                ratedAlbums.map((a) => (
+                  <AlbumCard
+                    key={`${a.albumTitle}-${a.artistName}`}
+                    Image={a.imageUrl}
+                    title={a.albumTitle}
+                    artist={a.artistName}
+                    onClick={() => {
+                      setSelectedAlbum(a);
+                    }}
+                    rating={a.rating}
+                    reviewTitle={a.reviewTitle}
+                    reviewText={a.reviewText}
+                  />
+                ))}
+              {SelectedAlbum != null && (
+                <div className="AlbumsContainer">
+                  <RatedAlbumCard
+                    SelectedAlbum={SelectedAlbum}
+                    release={SelectedAlbum.release}
+                    genre={SelectedAlbum.genres}
+                    token={token}
+                    albumId={SelectedAlbum.albumId}
+                    key={`${SelectedAlbum.albumTitle}-${SelectedAlbum.artistName}`}
+                    imageUrl={SelectedAlbum.imageUrl}
+                    artistName={SelectedAlbum.artistName}
+                    albumTitle={SelectedAlbum.albumTitle}
+                    onClose={() => setSelectedAlbum(null)}
+                    onClick={() => {
+                      console.log(
+                        `Rate button clicked for ${SelectedAlbum.albumTitle} by ${SelectedAlbum.artistName} rating: ${SelectedAlbum.rating}`
+                      );
+                    }}
+                    rating={SelectedAlbum.rating}
+                    reviewTitle={SelectedAlbum.reviewTitle}
+                    reviewText={SelectedAlbum.reviewText}
+                    setRatedAlbum={() => {
+                      // setRatedAlbum(SelectedAlbum);
+                      setRatedAlbums((prevRatedAlbums) => [
+                        ...prevRatedAlbums,
+                        SelectedAlbum,
+                      ]);
+                    }}
+                    onDelete={() => handleDeleteRating(SelectedAlbum.albumId)}
+                    Rated={true}
+                  />
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
         {viewMode === "filtered" && (
           <div className="AlbumsContainer">
             {FilteredAlbums.map((album) => (
@@ -273,25 +494,81 @@ function App() {
                 title={album.albumTitle}
                 artist={album.artistName}
                 onClick={() => {
-                  setSelectedAlbum(album);
+                  const ratedMatch = ratedAlbums.find(
+                    (a) => a.albumId === album.albumId
+                  );
+
+                  // if this album is in ratedAlbums, prefer that object
+                  setSelectedAlbum(ratedMatch || album);
+                  // setSelectedAlbum(album);
                 }}
               />
             ))}
-            {SelectedAlbum != null && (
-              <div className="AlbumsContainer">
-                <RateAlbumCard
-                  release={SelectedAlbum.release}
-                  genre={SelectedAlbum.genres}
-                  token={token}
-                  albumId={SelectedAlbum.albumId}
-                  key={`${SelectedAlbum.albumTitle}-${SelectedAlbum.artistName}`}
-                  imageUrl={SelectedAlbum.imageUrl}
-                  artistName={SelectedAlbum.artistName}
-                  albumTitle={SelectedAlbum.albumTitle}
-                  onClose={() => setSelectedAlbum(null)}
-                />
-              </div>
-            )}
+            {SelectedAlbum != null &&
+              !isObjectNotInArray(ratedAlbums, SelectedAlbum) && (
+                <div className="AlbumsContainer">
+                  <RateAlbumCard
+                    setSelectedAlbum={setSelectedAlbum}
+                    SelectedAlbum={SelectedAlbum}
+                    release={SelectedAlbum.release}
+                    genre={SelectedAlbum.genres}
+                    token={token}
+                    albumId={SelectedAlbum.albumId}
+                    key={`${SelectedAlbum.albumTitle}-${SelectedAlbum.artistName}`}
+                    imageUrl={SelectedAlbum.imageUrl}
+                    artistName={SelectedAlbum.artistName}
+                    albumTitle={SelectedAlbum.albumTitle}
+                    onClose={() => setSelectedAlbum(null)}
+                    onClick={() => {
+                      console.log(
+                        `Rate button clicked for ${SelectedAlbum.albumTitle} by ${SelectedAlbum.artistName} rating: ${SelectedAlbum.rating}`
+                      );
+                    }}
+                    rating={SelectedAlbum.rating}
+                    reviewTitle={SelectedAlbum.reviewTitle}
+                    reviewText={SelectedAlbum.reviewText}
+                    setRatedAlbum={() => {
+                      setRatedAlbum(SelectedAlbum);
+                      handleAlbumRated(SelectedAlbum, SelectedAlbum.rating);
+                    }}
+                    Rated={false}
+                  />
+                </div>
+              )}
+            {SelectedAlbum != null &&
+              isObjectNotInArray(ratedAlbums, SelectedAlbum) && (
+                <div className="AlbumsContainer">
+                  <RatedAlbumCard
+                    SelectedAlbum={SelectedAlbum}
+                    release={SelectedAlbum.release}
+                    genre={SelectedAlbum.genres}
+                    token={token}
+                    albumId={SelectedAlbum.albumId}
+                    key={`${SelectedAlbum.albumTitle}-${SelectedAlbum.artistName}`}
+                    imageUrl={SelectedAlbum.imageUrl}
+                    artistName={SelectedAlbum.artistName}
+                    albumTitle={SelectedAlbum.albumTitle}
+                    onClose={() => setSelectedAlbum(null)}
+                    onClick={() => {
+                      console.log(
+                        `Rate button clicked for ${SelectedAlbum.albumTitle} by ${SelectedAlbum.artistName} rating: ${SelectedAlbum.rating}`
+                      );
+                    }}
+                    rating={SelectedAlbum.rating}
+                    reviewTitle={SelectedAlbum.reviewTitle}
+                    reviewText={SelectedAlbum.reviewText}
+                    setRatedAlbum={() => {
+                      // setRatedAlbum(SelectedAlbum);
+                      setRatedAlbums((prevRatedAlbums) => [
+                        ...prevRatedAlbums,
+                        SelectedAlbum,
+                      ]);
+                    }}
+                    onDelete={() => handleDeleteRating(SelectedAlbum.albumId)}
+                    Rated={true}
+                  />
+                </div>
+              )}
           </div>
         )}
       </div>
