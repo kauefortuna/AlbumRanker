@@ -1,7 +1,7 @@
 {
-  "name": "Album-Ranker",
+  "name": "AlbumRanker",
   "private": true,
-  "homepage": "https://kauefortuna.github.io/Album-Ranker/",
+  "homepage": "https://kauefortuna.github.io/AlbumRanker/",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
