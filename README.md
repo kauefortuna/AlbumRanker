@@ -1,1 +1,1 @@
-https://kauefortuna.github.io/Album-Ranker/
+https://kauefortuna.github.io/AlbumRanker/
