@@ -19,7 +19,6 @@
   /* Main app container */
   .AppMain {
     width: 100%;
-    padding: 10% 0;
     margin: 0;
   }
 
@@ -55,8 +54,8 @@
   .HeaderBar {
     flex-direction: column;
     width: 100%;
-    gap: 3%;
-    padding: 2% 4%;
+    gap: 0%;
+    padding: 10% 4% 0 4%;
   }
 
   .HeaderBar h1 {
@@ -77,13 +76,12 @@
 
   .HeaderButtons {
     justify-content: center;
-    gap: 4%;
+    gap: 0%;
   }
 
   .HeaderButtons .active-btn {
-    padding: 3% 6%;
+    padding: 3% 3%;
     font-size: 3.5vw;
-    border-radius: 10px;
   }
 
   /* Rating card */

@@ -14,11 +14,6 @@ import { redirectToSpotifyAuth, getAccessToken } from "./spotifyAuth.js";
 import { fetchAlbum } from "./fetchAlbums";
 import RateAlbumCard from "./components/RateAlbumCard.jsx";
 import RatedAlbumCard from "./components/RatedAlbumCard.jsx";
-/* const token =
-    "BQC8fxNaAi0is4kNN3LXpYLgDQKGH7xLqswIDWLBUttUrx3nsp8mogUsZlr9dkqZ4grIiWMVuk1SnvdokX_JaG934ouMYaI2MT2jNdr_WTDekQfVG6wDZwyl1h3lEcBI3DoQt3ALsRtcs2ssqITNGw1BGHo5U4OsgsqJKdeUsrXwpPARnjSjLKtZRCDceLONGgbyEhHjOu1ZFlceB_2O9NcImJGgwhAEcpFJzg9xtG8MwOujKwvBOmOVRnuXuwYlBVxBFGAJbrRUjZjsdz4ohLm6288TkivrC1ekQ12ycjgVzoXA8UoT2HkGaKpWovmxrBKQ";
-  const userId = "198f3046d64c4939a13ea8578b392fe0";
-
-  */
 
 function isObjectNotInArray(arr, obj) {
   return arr.some((item) => item.albumId == obj.albumId);
@@ -32,6 +27,19 @@ function setSelectedIntoRated(arr, obj, func) {
 }
 
 function App() {
+  useEffect(() => {
+    const handleScroll = () => {
+      const header = document.querySelector(".HeaderBar");
+      const scrollY = window.scrollY;
+      const maxScroll = 300; // Adjust for when it becomes fully solid
+      const opacity = Math.min(scrollY / maxScroll + 0.3, 0.95); // Clamp between 0 and 1
+      header.style.backgroundColor = `rgba(124, 68, 150, ${opacity})`;
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const [token, setToken] = useState(null);
   const [loadingToken, setLoadingToken] = useState(true);
 
@@ -81,6 +89,10 @@ function App() {
   const [SelectedAlbum, setSelectedAlbum] = useState(null);
 
   const [ratedAlbum, setRatedAlbum] = useState(null);
+
+  const [btn1, setBtn1] = useState(true);
+  const [btn2, setBtn2] = useState(false);
+  const [btn3, setBtn3] = useState(false);
 
   const [ratedAlbums, setRatedAlbums] = useState(() => {
     try {
@@ -283,6 +295,8 @@ function App() {
 
   const [RatedResults, setRatedResults] = useState([]);
 
+  const [foundRated, setFoundRated] = useState(true);
+
   const searchRatedAlbums = (query) => {
     const q = query.toLowerCase();
 
@@ -291,6 +305,12 @@ function App() {
         a.albumTitle.toLowerCase().includes(q) ||
         a.artistName.toLowerCase().includes(q)
     );
+
+    if (results.length === 0) {
+      setFoundRated(false);
+    } else {
+      setFoundRated(true);
+    }
 
     setRatedResults(results);
   };
@@ -351,6 +371,9 @@ function App() {
                       // 🔍 Normal Spotify search
                       await fetchAlbum(inputValue, token, setFilteredAlbums);
                       setViewMode("filtered");
+                      setBtn1(false);
+                      setBtn2(true);
+                      setBtn3(false);
                     }
 
                     setSelectedAlbum(null);
@@ -364,35 +387,64 @@ function App() {
 
           <div className="HeaderButtons">
             <button
+              className={btn1 ? "active-btn2" : "active-btn"}
               onClick={() => {
                 setViewMode("all");
+                setFilteredAlbums([]);
                 setRatedResults([]);
                 setSelectedAlbum(null);
+                setBtn1(true);
+                setBtn2(false);
+                setBtn3(false);
               }}
-              className="active-btn"
             >
               All Albums
             </button>
             <button
               onClick={() => {
                 setViewMode("filtered");
+                setFilteredAlbums([]);
                 setRatedResults([]);
                 setSelectedAlbum(null);
+                setBtn1(false);
+                setBtn2(true);
+                setBtn3(false);
               }}
-              className="active-btn"
+              className={btn2 ? "active-btn2" : "active-btn"}
             >
               Filtered Albums
             </button>
             <button
               onClick={() => {
                 setViewMode("Rated");
+                setFilteredAlbums([]);
                 setRatedResults([]);
                 setSelectedAlbum(null);
+                setBtn1(false);
+                setBtn2(false);
+                setBtn3(true);
               }}
-              className="active-btn"
+              className={btn3 ? "active-btn2" : "active-btn"}
             >
               Rated Albums
             </button>
+            {viewMode === "Rated" && ratedAlbums.length > 0 && (
+              <button
+                onClick={() => {
+                  const confirmDelete = window.confirm(
+                    "Are you sure you want to delete all ratings?"
+                  );
+                  if (confirmDelete) {
+                    setRatedAlbums([]);
+                    setRatedResults([]);
+                    setSelectedAlbum(null);
+                  }
+                }}
+                className="active-btn"
+              >
+                Delete All Ratings
+              </button>
+            )}
           </div>
         </div>
 
@@ -400,7 +452,6 @@ function App() {
           <br></br>
           <br></br>
         </div>
-
         {viewMode === "all" && (
           <>
             <div className="carousel-wrapper">
@@ -418,6 +469,8 @@ function App() {
         {viewMode === "Rated" && (
           <>
             <div className="AlbumsContainer">
+              {ratedAlbums.length == 0 && <p>No rated albums found.</p>}
+              {!foundRated && <p>Album(s) not found.</p>}
               {RatedResults.length > 0 &&
                 RatedResults.map((a) => (
                   <AlbumCard
@@ -434,6 +487,7 @@ function App() {
                   />
                 ))}
               {RatedResults.length == 0 &&
+                foundRated &&
                 ratedAlbums.map((a) => (
                   <AlbumCard
                     key={`${a.albumTitle}-${a.artistName}`}
@@ -487,6 +541,9 @@ function App() {
 
         {viewMode === "filtered" && (
           <div className="AlbumsContainer">
+            {FilteredAlbums.length == 0 && (
+              <p>No albums found. Try searching for something else.</p>
+            )}
             {FilteredAlbums.map((album) => (
               <AlbumCard
                 key={`${album.albumTitle}-${album.artistName}`}

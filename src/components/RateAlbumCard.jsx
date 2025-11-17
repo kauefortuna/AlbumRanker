@@ -61,7 +61,10 @@ function RateAlbumCard({
           ✕
         </button>
         <div className="RateAlbumLeft">
-          <img className="RateAlbumCover" src={imageUrl} alt={albumTitle} />
+          <div className="RateAlbumCoverDiv">
+            <img className="RateAlbumCover" src={imageUrl} alt={albumTitle} />
+          </div>
+
           <div className="RateAlbumInfo">
             <h2>{albumTitle}</h2>
             <br></br>
