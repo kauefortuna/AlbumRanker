@@ -428,6 +428,20 @@ function App() {
             >
               Rated Albums
             </button>
+            <button
+              onClick={() => {
+                setViewMode("Rated");
+                setFilteredAlbums([]);
+                setRatedResults([]);
+                setSelectedAlbum(null);
+                setBtn1(false);
+                setBtn2(false);
+                setBtn3(true);
+              }}
+              className={btn3 ? "active-btn2" : "active-btn"}
+            >
+              LOGOUT
+            </button>
             {viewMode === "Rated" && ratedAlbums.length > 0 && (
               <button
                 onClick={() => {
