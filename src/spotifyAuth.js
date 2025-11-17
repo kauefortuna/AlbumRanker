@@ -2,7 +2,7 @@
 const clientId = "198f3046d64c4939a13ea8578b392fe0";
 const redirectUri =
   import.meta.env.PROD
-    ? "https://kauefortuna.github.io/Album-Ranker/"
+    ? "https://kauefortuna.github.io/AlbumRanker/"
     : "http://127.0.0.1:5173/";
 const scopes = ["user-top-read", "user-read-private", "user-read-email"];
 
